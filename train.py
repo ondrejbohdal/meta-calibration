@@ -185,9 +185,8 @@ def parseArgs():
     parser.add_argument("--second-milestone", type=int, default=second_milestone,
                         dest="second_milestone", help="Second milestone to change lr")
 
-    parser.add_argument("--meta_calibration", action="store_true", dest="meta_calibration",
+    parser.add_argument("--meta_calibration", type=str, default="none", dest="meta_calibration",
                         help="whether to use meta-calibration")
-    parser.set_defaults(meta_calibration=False)
     parser.add_argument("--meta_val_size", type=float, default=1.0, dest="meta_val_size",
                         help='how large meta val set should be - relative to val')
     parser.add_argument("--num_bins", type=int, default=15,
@@ -214,7 +213,7 @@ if __name__ == "__main__":
     num_classes = dataset_num_classes[args.dataset]
 
     # Choosing the model to train
-    if args.meta_calibration:
+    if args.meta_calibration != "none":
         Net.resnet.ResNet.meta = True
     net = models[args.model](num_classes=num_classes)
 
@@ -255,11 +254,22 @@ if __name__ == "__main__":
     else:
         net_fc = net.fc
 
-    learnable_regularization = [nn.Parameter(
-        torch.zeros_like(e)) for e in net_fc.parameters()]
-    meta_optimizer = torch.optim.Adam(learnable_regularization)
+    if args.meta_calibration == 'learnable_l2':
+        learnable_regularization = [nn.Parameter(
+            torch.zeros_like(e)) for e in net_fc.parameters()]
+        meta_optimizer = torch.optim.Adam(learnable_regularization)
+    elif args.meta_calibration == 'scalar_label_smoothing':
+        learnable_regularization = [nn.Parameter(torch.tensor(0.0).to(device))]
+        meta_optimizer = torch.optim.Adam(learnable_regularization)
+    elif args.meta_calibration == 'vector_label_smoothing':
+        learnable_regularization = [nn.Parameter(torch.zeros(num_classes).to(device))]
+        meta_optimizer = torch.optim.Adam(learnable_regularization)
+    else:
+        learnable_regularization = None
+        meta_optimizer = None
 
-    if args.meta_calibration:
+
+    if args.meta_calibration != "none":
         train_loader, val_loader, meta_loader = dataset_loader[args.dataset].get_train_valid_loader(
             batch_size=args.train_batch_size,
             augment=args.data_aug,
@@ -309,7 +319,7 @@ if __name__ == "__main__":
             else:
                 gamma = args.gamma
 
-            if args.meta_calibration:
+            if args.meta_calibration != "none":
                 meta_loader_copy = meta_loader
             else:
                 meta_loader_copy = val_loader

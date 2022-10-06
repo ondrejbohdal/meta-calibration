@@ -30,12 +30,34 @@ def get_learning_rate(optimizer):
     return lr
 
 
-def calculate_regularized_loss(logits, labels, learnable_regularization, loss_function,
-                               gamma, lamda, device, model_fc, args):
-    loss = loss_function_dict[loss_function](
-        logits, labels, gamma=gamma, lamda=lamda, device=device)
-    for param, reg_w in zip(model_fc.parameters(), learnable_regularization):
-        loss += torch.sum(reg_w * (param ** 2))
+def calculate_loss(logits, labels, learnable_regularization, loss_function,
+                   gamma, lamda, device, model_fc, args):
+    if args.meta_calibration == 'scalar_label_smoothing' or args.meta_calibration == 'vector_label_smoothing':
+        if args.dataset == 'cifar10':
+            num_classes = 10
+        elif args.dataset == 'cifar100':
+            num_classes = 100
+        else:
+            raise ValueError('Dataset ' + args.dataset + ' is not implemented yet.')
+
+        if args.meta_calibration == 'scalar_label_smoothing':
+            oh_labels = one_hot(labels, num_classes, device)
+            soft_labels = create_smooth_labels(
+                oh_labels, learnable_regularization[0], num_classes)
+        else:
+            soft_labels = create_class_smooth_labels(
+                labels, learnable_regularization[0], num_classes, device)
+
+        # soft_cross_entropy does sum reduction
+        loss = soft_cross_entropy(logits, soft_labels)
+    elif args.meta_calibration == 'learnable_l2':
+        loss = loss_function_dict[loss_function](
+            logits, labels, gamma=gamma, lamda=lamda, device=device)
+        for param, reg_w in zip(model_fc.parameters(), learnable_regularization):
+            loss += torch.sum(reg_w * (param ** 2))
+    else:
+        loss = loss_function_dict[loss_function](
+            logits, labels, gamma=gamma, lamda=lamda, device=device)
     return loss
 
 
@@ -60,6 +82,17 @@ def create_smooth_labels(labels, label_smoothing, num_classes):
     labels = labels * (1.0 - label_smoothing)
     labels = labels + label_smoothing / num_classes
     return labels
+
+
+def create_class_smooth_labels(labels, label_smoothing, num_classes, device):
+    """A method for calculating soft labels with smoothing specific to the class"""
+    targets = []
+    for target in labels:
+        soft_target = torch.zeros(num_classes).to(device=device)
+        soft_target[target] = (1.0 - label_smoothing[target])
+        soft_target += label_smoothing[target] / num_classes
+        targets.append(soft_target)
+    return torch.stack(targets)
 
 
 def soft_cross_entropy(pred, soft_targets):
@@ -91,7 +124,7 @@ def train_single_epoch(epoch,
     train_ece = 0
     ece_criterion = ECELoss().to(device)
     num_samples = 0
-    if args.meta_calibration:
+    if args.meta_calibration != "none":
         loaders = zip(train_loader, cycle(val_loader))
     else:
         loaders = train_loader
@@ -103,7 +136,7 @@ def train_single_epoch(epoch,
         model_fc = model.fc
 
     for batch_idx, batch in enumerate(loaders):
-        if args.meta_calibration:
+        if args.meta_calibration != "none":
             ((data, labels), (data_val, labels_val)) = batch
             data_val = data_val.to(device)
             labels_val = labels_val.to(device)
@@ -114,7 +147,7 @@ def train_single_epoch(epoch,
 
         optimizer.zero_grad()
 
-        if args.meta_calibration:
+        if args.meta_calibration != "none":
             # simulate an update - but only using the classifier - the rest will appear frozen
             fast_parameters = list(model_fc.parameters())
             for weight in model_fc.parameters():
@@ -122,7 +155,7 @@ def train_single_epoch(epoch,
             optimizer.zero_grad()
 
             logits = model(data)
-            loss = calculate_regularized_loss(
+            loss = calculate_loss(
                 logits, labels, learnable_regularization, loss_function, gamma, lamda, device, model_fc, args)
             grad = torch.autograd.grad(loss, fast_parameters, create_graph=True)
             fast_parameters = []
@@ -143,12 +176,16 @@ def train_single_epoch(epoch,
             meta_loss.backward(retain_graph=True)
             meta_optimizer.step()
 
+            if args.meta_calibration == 'scalar_label_smoothing' or args.meta_calibration == 'vector_label_smoothing':
+                learnable_regularization[0].data = torch.clamp(
+                    learnable_regularization[0], min=0.0, max=0.5).data
+
             # reset the fast weights to None
             for weight in model_fc.parameters():
                 weight.fast = None
 
             # standard update of the model is done afterwards
-            loss = calculate_regularized_loss(
+            loss = calculate_loss(
                 logits, labels, learnable_regularization, loss_function, gamma, lamda, device, model_fc, args)
             train_ece += len(data) * ece_criterion(logits, labels).item()
         else:
