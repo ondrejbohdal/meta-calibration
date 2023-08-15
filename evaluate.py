@@ -24,69 +24,109 @@ from temperature_scaling import ModelWithTemperature
 
 
 # Dataset params
-dataset_num_classes = {
-    'cifar10': 10,
-    'cifar100': 100
-}
+dataset_num_classes = {"cifar10": 10, "cifar100": 100}
 
-dataset_loader = {
-    'cifar10': cifar10,
-    'cifar100': cifar100
-}
+dataset_loader = {"cifar10": cifar10, "cifar100": cifar100}
 
 # Mapping model name to model function
-models = {
-    'resnet18': resnet18
-}
+models = {"resnet18": resnet18}
 
 
 def parseArgs():
-    default_dataset = 'cifar10'
-    dataset_root = './'
-    model = 'resnet18'
-    save_loc = './'
-    saved_model_name = 'resnet18_cross_entropy_350.model'
-    exp_name = 'resnet18_cross_entropy'
+    default_dataset = "cifar10"
+    dataset_root = "./"
+    model = "resnet18"
+    save_loc = "./"
+    saved_model_name = "resnet18_cross_entropy_350.model"
+    exp_name = "resnet18_cross_entropy"
     num_bins = 15
     model_name = None
     train_batch_size = 128
     test_batch_size = 128
-    cross_validation_error = 'ece'
+    cross_validation_error = "ece"
 
     parser = argparse.ArgumentParser(
         description="Evaluating a single model on calibration metrics.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--dataset", type=str, default=default_dataset,
-                        dest="dataset", help='dataset to test on')
-    parser.add_argument("--dataset-root", type=str, default=dataset_root,
-                        dest="dataset_root", help='root path of the dataset')
-    parser.add_argument("--model-name", type=str, default=model_name,
-                        dest="model_name", help='name of the model')
-    parser.add_argument("--model", type=str, default=model, dest="model",
-                        help='Model to test')
-    parser.add_argument("--save-path", type=str, default=save_loc,
-                        dest="save_loc",
-                        help='Path to import the model')
-    parser.add_argument("--saved_model_name", type=str, default=saved_model_name,
-                        dest="saved_model_name", help="file name of the pre-trained model")
-    parser.add_argument("--exp_name", type=str, default=exp_name,
-                        dest="exp_name", help="name of the experiment")
-    parser.add_argument("--num-bins", type=int, default=num_bins, dest="num_bins",
-                        help='Number of bins')
-    parser.add_argument("-g", action="store_true", dest="gpu",
-                        help="Use GPU")
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default=default_dataset,
+        dest="dataset",
+        help="dataset to test on",
+    )
+    parser.add_argument(
+        "--dataset-root",
+        type=str,
+        default=dataset_root,
+        dest="dataset_root",
+        help="root path of the dataset",
+    )
+    parser.add_argument(
+        "--model-name",
+        type=str,
+        default=model_name,
+        dest="model_name",
+        help="name of the model",
+    )
+    parser.add_argument(
+        "--model", type=str, default=model, dest="model", help="Model to test"
+    )
+    parser.add_argument(
+        "--save-path",
+        type=str,
+        default=save_loc,
+        dest="save_loc",
+        help="Path to import the model",
+    )
+    parser.add_argument(
+        "--saved_model_name",
+        type=str,
+        default=saved_model_name,
+        dest="saved_model_name",
+        help="file name of the pre-trained model",
+    )
+    parser.add_argument(
+        "--exp_name",
+        type=str,
+        default=exp_name,
+        dest="exp_name",
+        help="name of the experiment",
+    )
+    parser.add_argument(
+        "--num-bins", type=int, default=num_bins, dest="num_bins", help="Number of bins"
+    )
+    parser.add_argument("-g", action="store_true", dest="gpu", help="Use GPU")
     parser.set_defaults(gpu=True)
-    parser.add_argument("-da", action="store_true", dest="data_aug",
-                        help="Using data augmentation")
+    parser.add_argument(
+        "-da", action="store_true", dest="data_aug", help="Using data augmentation"
+    )
     parser.set_defaults(data_aug=True)
-    parser.add_argument("-b", type=int, default=train_batch_size,
-                        dest="train_batch_size", help="Batch size")
-    parser.add_argument("-tb", type=int, default=test_batch_size,
-                        dest="test_batch_size", help="Test Batch size")
-    parser.add_argument("--cverror", type=str, default=cross_validation_error,
-                        dest="cross_validation_error", help='Error function to do temp scaling')
-    parser.add_argument("-log", action="store_true", dest="log",
-                        help="whether to print log data")
+    parser.add_argument(
+        "-b",
+        type=int,
+        default=train_batch_size,
+        dest="train_batch_size",
+        help="Batch size",
+    )
+    parser.add_argument(
+        "-tb",
+        type=int,
+        default=test_batch_size,
+        dest="test_batch_size",
+        help="Test Batch size",
+    )
+    parser.add_argument(
+        "--cverror",
+        type=str,
+        default=cross_validation_error,
+        dest="cross_validation_error",
+        help="Error function to do temp scaling",
+    )
+    parser.add_argument(
+        "-log", action="store_true", dest="log", help="whether to print log data"
+    )
 
     return parser.parse_args()
 
@@ -106,8 +146,10 @@ def get_logits_labels(data_loader, net):
     return logits, labels
 
 
-def update_json_experiment_log_dict(experiment_update_dict, json_experiment_log_file_name):
-    with open(json_experiment_log_file_name, 'r') as f:
+def update_json_experiment_log_dict(
+    experiment_update_dict, json_experiment_log_file_name
+):
+    with open(json_experiment_log_file_name, "r") as f:
         summary_dict = json.load(fp=f)
 
     for key in experiment_update_dict:
@@ -115,15 +157,14 @@ def update_json_experiment_log_dict(experiment_update_dict, json_experiment_log_
             summary_dict[key] = []
         summary_dict[key].append(experiment_update_dict[key])
 
-    with open(json_experiment_log_file_name, 'w') as f:
+    with open(json_experiment_log_file_name, "w") as f:
         json.dump(summary_dict, fp=f)
 
 
 if __name__ == "__main__":
-
     # Checking if GPU is available
     cuda = False
-    if (torch.cuda.is_available()):
+    if torch.cuda.is_available():
         cuda = True
 
     # Setting additional parameters
@@ -145,17 +186,16 @@ if __name__ == "__main__":
 
     # Taking input for the dataset
     num_classes = dataset_num_classes[dataset]
-    
+
     _, val_loader = dataset_loader[args.dataset].get_train_valid_loader(
         batch_size=args.train_batch_size,
         augment=args.data_aug,
         random_seed=1,
-        pin_memory=args.gpu
+        pin_memory=args.gpu,
     )
 
     test_loader = dataset_loader[args.dataset].get_test_loader(
-        batch_size=args.test_batch_size,
-        pin_memory=args.gpu
+        batch_size=args.test_batch_size, pin_memory=args.gpu
     )
 
     model = models[model_name]
@@ -179,17 +219,18 @@ if __name__ == "__main__":
     p_cece = cece_criterion(logits, labels).item()
     p_nll = nll_criterion(logits, labels).item()
 
-    res_str = '{:s}&{:.4f}&{:.4f}&{:.4f}&{:.4f}&{:.4f}'.format(saved_model_name,  1-p_accuracy,  p_nll,  p_ece,  p_adaece, p_cece)
+    res_str = "{:s}&{:.4f}&{:.4f}&{:.4f}&{:.4f}&{:.4f}".format(
+        saved_model_name, 1 - p_accuracy, p_nll, p_ece, p_adaece, p_cece
+    )
 
     # Printing the required evaluation metrics
     if args.log:
-        print (conf_matrix)
-        print ('Test error: ' + str((1 - p_accuracy)))
-        print ('Test NLL: ' + str(p_nll))
-        print ('ECE: ' + str(p_ece))
-        print ('AdaECE: ' + str(p_adaece))
-        print ('Classwise ECE: ' + str(p_cece))
-
+        print(conf_matrix)
+        print("Test error: " + str((1 - p_accuracy)))
+        print("Test NLL: " + str(p_nll))
+        print("ECE: " + str(p_ece))
+        print("AdaECE: " + str(p_adaece))
+        print("Classwise ECE: " + str(p_cece))
 
     scaled_model = ModelWithTemperature(net, args.log)
     scaled_model.set_temperature(val_loader, cross_validate=cross_validation_error)
@@ -202,35 +243,38 @@ if __name__ == "__main__":
     cece = cece_criterion(logits, labels).item()
     nll = nll_criterion(logits, labels).item()
 
-    res_str += '&{:.4f}({:.2f})&{:.4f}&{:.4f}&{:.4f}'.format(nll,  T_opt,  ece,  adaece, cece)
+    res_str += "&{:.4f}({:.2f})&{:.4f}&{:.4f}&{:.4f}".format(
+        nll, T_opt, ece, adaece, cece
+    )
 
     if args.log:
-        print ('Optimal temperature: ' + str(T_opt))
-        print (conf_matrix)
-        print ('Test error: ' + str((1 - accuracy)))
-        print ('Test NLL: ' + str(nll))
-        print ('ECE: ' + str(ece))
-        print ('AdaECE: ' + str(adaece))
-        print ('Classwise ECE: ' + str(cece))
+        print("Optimal temperature: " + str(T_opt))
+        print(conf_matrix)
+        print("Test error: " + str((1 - accuracy)))
+        print("Test NLL: " + str(nll))
+        print("ECE: " + str(ece))
+        print("AdaECE: " + str(adaece))
+        print("Classwise ECE: " + str(cece))
 
     # Test NLL & ECE & AdaECE & Classwise ECE
     print(res_str)
 
     # save the statistics
     experiment_update_dict = {
-        'test_err': 1 - p_accuracy,
-        'test_nll': p_nll,
-        'test_ece': p_ece,
-        'test_aece': p_adaece,
-        'test_cece': p_cece,
-        'test_err_t': 1 - accuracy,
-        'test_nll_t': nll,
-        'test_ece_t': ece,
-        'test_aece_t': adaece,
-        'test_cece_t': cece,
-        'opt_t': T_opt,
+        "test_err": 1 - p_accuracy,
+        "test_nll": p_nll,
+        "test_ece": p_ece,
+        "test_aece": p_adaece,
+        "test_cece": p_cece,
+        "test_err_t": 1 - accuracy,
+        "test_nll_t": nll,
+        "test_ece_t": ece,
+        "test_aece_t": adaece,
+        "test_cece_t": cece,
+        "opt_t": T_opt,
     }
-    json_experiment_log_file_name = os.path.join('Experiments', args.exp_name + '.json')
+    json_experiment_log_file_name = os.path.join("Experiments", args.exp_name + ".json")
 
     update_json_experiment_log_dict(
-        experiment_update_dict, json_experiment_log_file_name)
+        experiment_update_dict, json_experiment_log_file_name
+    )

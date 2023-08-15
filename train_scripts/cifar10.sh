@@ -56,4 +56,4 @@ python ../train.py \
 --loss cross_entropy \
 --save-path ../Models/ \
 --exp_name resnet18_cifar10_meta_calibration \
---meta_calibration
+--meta_calibration non_uniform_label_smoothing
