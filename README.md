@@ -36,11 +36,11 @@ The example script uses `non_uniform_label_smoothing`, but it is possible to als
 
 If you find this useful for your research, please consider citing:
  ```
- @article{bohdal2021meta-calibration,
+ @article{bohdal2023metacalibration,
    title={Meta-Calibration: Learning of Model Calibration Using Differentiable Expected Calibration Error},
-   author={Bohdal, Ondrej and Yang, Yongxin and Hospedales, Timothy},
-   journal={arXiv preprint arXiv:2106.09613},
-   year={2021}
+   author={Ondrej Bohdal and Yongxin Yang and Timothy Hospedales},
+   journal={Transactions on Machine Learning Research},
+   year={2023}
 }
  ```
 
